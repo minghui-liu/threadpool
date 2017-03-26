@@ -14,7 +14,8 @@ typedef struct thread_t {
 } thread_t;
 
 typedef struct job_t {
-	void (*function)(void *pkg);	/* function pointer */
+	void *(*function)(void *pkg);	/* function pointer */
+	void *args;						/* arguments */
 } job_t;
 
 typedef struct jobqueue_t {
@@ -22,19 +23,19 @@ typedef struct jobqueue_t {
 	int front;
 	int nextempty;
 	int size;
+	pthread_mutex_t lock;
+	pthread_cond_t condvar;
 } jobqueue_t;
 
 typedef struct threadpool_t {
 	int num_threads;
 	thread_t *threads;
 	jobqueue_t *jobqueue;
+
 } threadpool_t;
 
 /* prototypes */
 threadpool_t *threadpool_create(size_t num_threads);
 void threadpool_destroy(threadpool_t *thpool);
-void thread_create(thread_t *thread);
-void thread_destroy(thread_t *thread);
-void *thread_idle(void *pkg);
 
 #endif
