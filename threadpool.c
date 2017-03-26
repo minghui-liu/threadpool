@@ -108,17 +108,20 @@ void thread_destroy(thread_t *thread) {
  */
 void threadpool_destroy(threadpool_t *thpool) {
 	keepalive = 0;
-	/* wait everyone up */
+	/* wake up all waiting threads */
 	pthread_cond_broadcast(&(thpool->jobqueue->condvar));
 
+	/* destroy all threads */
 	int i;
 	for (i = 0; i < thpool->num_threads; i++) {
 		thread_destroy(&(thpool->threads[i]));
 	}
 	printf("finished joining threads\n");
-	free(thpool->threads);
-	free(thpool);
 
+	free(thpool->threads);
+	free(thpool->jobqueue->queue);
+	free(thpool->jobqueue);
+	free(thpool);
 }
 
 /*
@@ -127,10 +130,6 @@ void threadpool_destroy(threadpool_t *thpool) {
 int threadpool_add_work(threadpool_t *thpool, void *(*function)(void *), void *args) {
 	enqueue(thpool->jobqueue, function, args);
 }
-
-/*
- * threadpool_
- */
 
 /*
  * enqueue - add a job to the end of the job queue
