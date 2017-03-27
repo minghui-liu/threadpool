@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/kevinlmh/threadpool.svg?branch=master)](https://travis-ci.org/kevinlmh/threadpool)
+
 # An elegant thread pool implementation in C
 
 * Simple and clean API
