@@ -1,9 +1,10 @@
 [![Build Status](https://travis-ci.org/kevinlmh/threadpool.svg?branch=master)](https://travis-ci.org/kevinlmh/threadpool)
 
-# An elegant thread pool implementation in C
+# An elegant POSIX compatible thread pool implementation in C
 
 ## Features
 * Simple and clean API
+* ANSI C and POSIX compatible
 * Small filesize, just two files, easy to add to your project
 * Well documented and readable code, easy to understand and to modify
 
