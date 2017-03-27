@@ -28,9 +28,10 @@
 #include "threadpool.h"
 
 
-static void thread_create(threadpool_t *thpool, thread_t *thread);
-static void thread_destroy(thread_t *thread);
-static void *thread_work(void *args);
+static void create_worker(threadpool_t *thpool, thread_t *thread);
+static void destroy_worker(thread_t *thread);
+static void *worker_thread(void *args);
+static void notify_waiters(threadpool_t *thpool);
 static void enqueue(jobqueue_t *jobqueue, void *(*function)(void *), void *args);
 static void dequeue(jobqueue_t *jobqueue, job_t *job);
 
@@ -67,17 +68,13 @@ threadpool_t *threadpool_create(size_t num_threads) {
 		return NULL;
 	}
 
-	printf("creating pthreads ...\n");
 	/* create threads in pool */
 	int i;
 	for (i = 0; i < thpool->num_threads; i++) {
-		// printf("creating thread %d\n", i);
 		thpool->threads[i].id = i;
-		thread_create(thpool, &(thpool->threads[i]));
+		create_worker(thpool, &(thpool->threads[i]));
 		// thread_detach(&(thpool->threads[i]));
-		i == num_threads-1 ? printf("+\n") : printf("+");
 	}
-	printf("finished creating threads.\n");
 	
 	return thpool;
 }
@@ -95,15 +92,13 @@ int threadpool_add_work(threadpool_t *thpool, void *(*function)(void *), void *a
  */
 void threadpool_destroy(threadpool_t *thpool) {
 	thpool->keepalive = 0;
-	/* wake up all waiting threads */
-	pthread_cond_broadcast(&(thpool->jobqueue->condvar));
+	notify_waiters(thpool);
 
 	/* destroy all threads */
 	int i;
 	for (i = 0; i < thpool->num_threads; i++) {
-		thread_destroy(&(thpool->threads[i]));
+		destroy_worker(&(thpool->threads[i]));
 	}
-	printf("finished joining threads\n");
 
 	free(thpool->threads);
 	free(thpool->jobqueue->queue);
@@ -111,19 +106,24 @@ void threadpool_destroy(threadpool_t *thpool) {
 	free(thpool);
 }
 
+static void notify_waiters(threadpool_t *thpool) {
+	/* wake up all waiting threads */
+	pthread_cond_broadcast(&(thpool->jobqueue->condvar));
+}
+
 /*
- * thread_create - create one thread
+ * create_worker - create a worker thread
  */
-static void thread_create(threadpool_t *thpool, thread_t *thread) {
-	if (pthread_create(&(thread->pthread_handle), NULL, thread_work, (void *)thpool)) {
-		fprintf(stderr, "thread_create(): Could not create thread\n");
+static void create_worker(threadpool_t *thpool, thread_t *thread) {
+	if (pthread_create(&(thread->pthread_handle), NULL, worker_thread, (void *)thpool)) {
+		fprintf(stderr, "create_worker(): Could not create thread\n");
 	}
 }
 
 /*
- * thread_work - repeatedly retrieve job form job queue and work on it
+ * worker_thread - repeatedly retrieve job form job queue and work on it
  */
-static void *thread_work(void *args) {
+static void *worker_thread(void *args) {
 	threadpool_t *thpool = (threadpool_t *)args;
 	jobqueue_t *jobqueue = thpool->jobqueue;
 	job_t job;
@@ -136,11 +136,10 @@ static void *thread_work(void *args) {
 }
 
 /*
- * thread_destroy - destroy a single thread
+ * destroy_worker - destroy a single worker thread
  */
-static void thread_destroy(thread_t *thread) {
+static void destroy_worker(thread_t *thread) {
 	pthread_join(thread->pthread_handle, NULL);
-	printf("joined thread %d\n", thread->id);
 }
 
 /*
