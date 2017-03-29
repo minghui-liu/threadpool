@@ -172,8 +172,10 @@ static void dequeue(jobqueue_t *jobqueue, job_t *job) {
 	/* if jobqueue is empty, wait */
 	while (jobqueue->nextempty == jobqueue->front) {
 		pthread_cond_wait(&(jobqueue->condvar), &(jobqueue->lock));
-		if (!(jobqueue->thpool->keepalive))
-			exit(0);
+		if (!(jobqueue->thpool->keepalive)) {
+			pthread_mutex_unlock(&(jobqueue->lock));
+			pthread_exit(0);
+		}
 	}
 
 	/* critical section, remove a job */
