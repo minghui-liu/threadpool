@@ -62,7 +62,7 @@ struct threadpool_t {
 };
 
 /* prototypes */
-threadpool_t *threadpool_create(size_t num_threads);
+threadpool_t *threadpool_create(size_t num_threads, size_t jobqueue_size);
 void threadpool_destroy(threadpool_t *thpool);
 int threadpool_add_work(threadpool_t *thpool, void *(*function)(void *), void *args);
 
