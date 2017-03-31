@@ -4,7 +4,7 @@
 void *print_num(void *args);
 
 int main() {
-	threadpool_t *thpool = threadpool_create(4);
+	threadpool_t *thpool = threadpool_create(4, 4);
 	threadpool_add_work(thpool, print_num, (void *)1);
 	threadpool_add_work(thpool, print_num, (void *)2);
 	threadpool_add_work(thpool, print_num, (void *)3);

@@ -24,6 +24,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <signal.h>
 
 #include "threadpool.h"
 
@@ -35,12 +36,16 @@ static void notify_waiters(threadpool_t *thpool);
 static void enqueue(jobqueue_t *jobqueue, void *(*function)(void *), void *args);
 static void dequeue(jobqueue_t *jobqueue, job_t *job);
 
+static sigset_t fillset;	
+
 /*
  * threadpool_create - create a thread pool of size threads
  */
-threadpool_t *threadpool_create(size_t num_threads) {
+threadpool_t *threadpool_create(size_t num_threads, size_t jobqueue_size) {
 	threadpool_t *thpool;
 	
+	sigfillset(&fillset);
+
 	/* allocate space for thread pool */
 	thpool = (threadpool_t *)malloc(sizeof(threadpool_t));
 
@@ -53,7 +58,7 @@ threadpool_t *threadpool_create(size_t num_threads) {
 
 	/* allocate space for jobqueue */
 	thpool->jobqueue = (jobqueue_t *)malloc(sizeof(jobqueue_t));
-	thpool->jobqueue->size = 16; 
+	thpool->jobqueue->size = jobqueue_size; 
 	thpool->jobqueue->queue = (job_t *)malloc(thpool->jobqueue->size * sizeof(job_t));
 	thpool->jobqueue->front = 0;
 	thpool->jobqueue->nextempty = 0;
@@ -115,9 +120,12 @@ static void notify_waiters(threadpool_t *thpool) {
  * create_worker - create a worker thread
  */
 static void create_worker(threadpool_t *thpool, thread_t *thread) {
+	sigset_t original_set;
+	pthread_sigmask(SIG_SETMASK, &fillset, &original_set);
 	if (pthread_create(&(thread->pthread_handle), NULL, worker_thread, (void *)thpool)) {
 		fprintf(stderr, "create_worker(): Could not create thread\n");
 	}
+	pthread_sigmask(SIG_SETMASK, &original_set, NULL);
 }
 
 /*
