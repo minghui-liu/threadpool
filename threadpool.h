@@ -37,6 +37,8 @@ typedef struct job_t job_t;
 struct thread_t {
 	int id;
 	pthread_t pthread_handle;
+	thread_t *prev;
+	thread_t *next;
 };
 
 struct job_t {
@@ -56,13 +58,14 @@ struct jobqueue_t {
 
 struct threadpool_t {
 	int num_threads;
-	thread_t *threads;
+	thread_t *threads_head;
+	thread_t *threads_tail;
 	jobqueue_t *jobqueue;
 	int keepalive;
 };
 
 /* prototypes */
-threadpool_t *threadpool_create(size_t num_threads, size_t jobqueue_size);
+threadpool_t *threadpool_create(size_t min_threads, size_t max_threads, size_t jobqueue_size);
 void threadpool_destroy(threadpool_t *thpool);
 int threadpool_add_work(threadpool_t *thpool, void *(*function)(void *), void *args);
 

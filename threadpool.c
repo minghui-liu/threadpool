@@ -41,19 +41,23 @@ static sigset_t fillset;
 /*
  * threadpool_create - create a thread pool of size threads
  */
-threadpool_t *threadpool_create(size_t num_threads, size_t jobqueue_size) {
+threadpool_t *threadpool_create(size_t min_threads, size_t max_threads, size_t jobqueue_size) {
+	/* check if min_threads and max_threads are valid */
+	if (min_threads < 0 || max_threads <= 0 || min_threads > max_threads) {
+		// invalid, should error and return NULL
+		fprintf(stderr, "threadpool_create(): invalid min and max thread numbers\n");
+		return NULL;
+	}
+
 	threadpool_t *thpool;
-	
 	sigfillset(&fillset);
 
 	/* allocate space for thread pool */
 	thpool = (threadpool_t *)malloc(sizeof(threadpool_t));
-
 	if (thpool == NULL) {
 		fprintf(stderr, "threadpool_create(): Could not allocate memory for thread pool\n");
 		return NULL;
 	}
-	thpool->num_threads = num_threads;
 	thpool->keepalive = 1;
 
 	/* allocate space for jobqueue */
@@ -66,22 +70,44 @@ threadpool_t *threadpool_create(size_t num_threads, size_t jobqueue_size) {
 	pthread_mutex_init(&(thpool->jobqueue->lock), NULL);
 	pthread_cond_init(&(thpool->jobqueue->condvar), NULL);
 
-	/* allocate space for threads */
-	thpool->threads = (thread_t *)malloc(num_threads * sizeof(thread_t));
-	if (thpool->threads == NULL) {
-		fprintf(stderr, "threadpool_create(): Could not allocate memory for threads\n");
-		return NULL;
+	/* create min number of threads and put them in a doubly linkedlist */
+	thpool->threads_head = thpool->threads_tail = NULL;		// in case min_threads == 0
+	int i;
+	for (i = 0; i < min_threads; i++) {
+		thread_t *temp = (thread_t *)malloc(sizeof(thread_t));
+		create_worker(thpool, temp);
+		if (temp == NULL) {
+			fprintf(stderr, "threadpool_create(): Could not allocate memory for threads\n");
+			return NULL;
+		}
+		if (i == 0) {
+			thpool->threads_head = thpool->threads_tail = temp;
+		} else {	
+			// attach to the end of linkedlist
+			thpool->threads_tail->next = temp;
+			temp->prev = thpool->threads_tail;
+			thpool->threads_tail = temp;
+		}
 	}
 
-	/* create threads in pool */
-	int i;
-	for (i = 0; i < thpool->num_threads; i++) {
-		thpool->threads[i].id = i;
-		create_worker(thpool, &(thpool->threads[i]));
-		// thread_detach(&(thpool->threads[i]));
-	}
+	thpool->num_threads = min_threads;
+	// TODO: move thpool->keepalive = 1 here
+	// start workers here
+	// or maybe let the user start threadpool
 	
 	return thpool;
+}
+
+//
+// TODO: add methods to dynamically chang the nunmber of threads
+//
+/*
+ * threadpool_adjust - adjust the number of threads in threadpool
+ *   returns 1 if successful otherwise returns 0
+ */
+int threadpool_adjust(threadpool_t *thpool, size_t min_threads, size_t max_threads) {
+	// TODO: implement thread number adjustment
+	return 0;
 }
 
 /*
@@ -99,13 +125,16 @@ void threadpool_destroy(threadpool_t *thpool) {
 	thpool->keepalive = 0;
 	notify_waiters(thpool);
 
-	/* destroy all threads */
-	int i;
-	for (i = 0; i < thpool->num_threads; i++) {
-		destroy_worker(&(thpool->threads[i]));
+	/* destroy all threads, from tail forward */
+	thread_t *runner = thpool->threads_tail;
+	while (runner) {
+		destroy_worker(runner);
+		thread_t *prev = runner->prev;
+		free(runner);
+		runner = prev;
 	}
+	thpool->threads_head = thpool->threads_tail = NULL;
 
-	free(thpool->threads);
 	free(thpool->jobqueue->queue);
 	free(thpool->jobqueue);
 	free(thpool);
@@ -116,6 +145,7 @@ static void notify_waiters(threadpool_t *thpool) {
 	pthread_cond_broadcast(&(thpool->jobqueue->condvar));
 }
 
+// TODO: return error code if error()
 /*
  * create_worker - create a worker thread
  */
@@ -135,6 +165,9 @@ static void *worker_thread(void *args) {
 	threadpool_t *thpool = (threadpool_t *)args;
 	jobqueue_t *jobqueue = thpool->jobqueue;
 	job_t job;
+	// TODO: change condition here
+	// while i am idle for longer than threshhold and nthreads > min
+	// i can therminate
 	while (thpool->keepalive) {
 		/* get a job from job queue */
 		dequeue(jobqueue, &job);
