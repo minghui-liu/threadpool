@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/kevinlmh/threadpool.svg?branch=master)](https://travis-ci.org/kevinlmh/threadpool)
+[![Build Status](https://travis-ci.org/minghui-liu/threadpool.svg?branch=master)](https://travis-ci.org/minghui-liu/threadpool)
 
 # An elegant POSIX compatible thread pool implementation in C
 
